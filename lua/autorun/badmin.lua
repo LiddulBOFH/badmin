@@ -114,7 +114,7 @@ if SERVER then
             BAdmin.UserList["id" .. FinalID] = rank
         end
 
-        if opt_ply then opt_ply:SetNWString("UserGroup",BAdmin.UserList["id" .. FinalID] or "user") end
+        if opt_ply then opt_ply:SetUserGroup(BAdmin.UserList["id" .. FinalID] or "") opt_ply:SetNWString("UserGroup",BAdmin.UserList["id" .. FinalID] or "user") end
 
         file.Write("badmin/users.txt",util.TableToJSON(BAdmin.UserList))
     end
@@ -863,7 +863,8 @@ if SERVER then
         CMDData[k] = Data
     end
 
-    net.Receive("BAdmin.requestCommands",function(_,ply)
+    net.Receive("BAdmin.requestCommands",function(_,ply) -- also the first breathing moment the player can do anything
+        BAdmin.Utilities.chatPrint(ply,{Color(200,200,200),"You have the rank of ",Color(255,127,127),BAdmin.UserList["id" .. ply:SteamID64()],Color(200,200,200)," here!"})
         net.Start("BAdmin.commandList")
             net.WriteTable(CMDList)
             net.WriteTable(CMDData)
@@ -905,8 +906,8 @@ if SERVER then
 
     hook.Add("PlayerInitialSpawn","BAdmin.InitialSpawn",function(ply)
         if BAdmin.UserList["id" .. ply:SteamID64()] then
+            ply:SetUserGroup(BAdmin.UserList["id" .. ply:SteamID64()] or "")
             ply:SetNWString("UserGroup",BAdmin.UserList["id" .. ply:SteamID64()] or "user") -- assign the rank they have
-            BAdmin.Utilities.chatPrint(ply,{Color(200,200,200),"You have the rank of ",Color(255,127,127),BAdmin.UserList["id" .. ply:SteamID64()],Color(200,200,200)," here!"})
         end
     end)
 
