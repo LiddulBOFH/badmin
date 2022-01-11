@@ -371,6 +371,7 @@ if SERVER then
         if not CanNoclip:GetBool() and (BAdmin.Utilities.checkPriv(ply) == 0) then return false,"Teleporting is disabled! (Noclip disabled)" end
         ply:SetNWVector("BAdmin.ReturnPos",ply:GetPos())
         ply:SetPos(ply:GetEyeTrace().HitPos)
+        ply:SetLocalVelocity(Vector(0,0,0))
         return true
     end
     cmdSettings = {["Help"] = " - Teleports you to your aimpoint"}
@@ -382,6 +383,7 @@ if SERVER then
         if LastLocation == false then return false, "You haven't teleported yet!" end
         ply:SetNWVector("BAdmin.ReturnPos",ply:GetPos())
         ply:SetPos(LastLocation)
+        ply:SetLocalVelocity(Vector(0,0,0))
         return true
     end
     cmdSettings = {["Help"] = " - Returns you to your last location"}
@@ -393,6 +395,7 @@ if SERVER then
         local dir = (args[1]:GetPos() - ply:GetPos()):GetNormalized()
         ply:SetNWVector("BAdmin.ReturnPos",ply:GetPos())
         ply:SetPos(args[1]:GetPos() - (dir * 64))
+        ply:SetLocalVelocity(Vector(0,0,0))
         return true
     end
     cmdSettings = {
@@ -408,6 +411,7 @@ if SERVER then
         local dir = (ply:GetPos() - args[1]:GetPos()):GetNormalized()
         args[1]:SetNWVector("BAdmin.ReturnPos",args[1]:GetPos())
         args[1]:SetPos(ply:GetPos() - (dir * 64))
+        args[1]:SetLocalVelocity(Vector(0,0,0))
         return true
     end
     cmdSettings = {
@@ -430,7 +434,8 @@ if SERVER then
         end
 
         if not IsRCON then
-            BAdmin.Utilities.chatPrint(ply,{Color(200,200,200),"You have the rank ",Color(255,127,127),BAdmin.UserList["id" .. ply:SteamID64()],Color(200,200,200),". Your permission level is ",Color(255,127,127),tostring(plyPriv),Color(200,200,200),"."})
+            local FinalRank = (ply:IsListenServerHost() and "host") or BAdmin.UserList["id" .. ply:SteamID64()]
+            BAdmin.Utilities.chatPrint(ply,{Color(200,200,200),"You have the rank ",Color(255,127,127),FinalRank,Color(200,200,200),". Your permission level is ",Color(255,127,127),tostring(plyPriv),Color(200,200,200),"."})
         else
             MsgN("RCON has access to all commands that don't rely on a player.")
         end
@@ -799,6 +804,7 @@ if SERVER then
         timer.Simple(0,function() ply:StripWeapons() end) -- must be delayed by a single tick otherwise it won't work
         if BAdmin.Jail.JailPos != false then
             ply:SetPos(BAdmin.Jail.JailPos)
+            ply:SetLocalVelocity(Vector(0,0,0))
         end
     end)
 
@@ -867,7 +873,8 @@ if SERVER then
         ply:SetUserGroup(BAdmin.UserList["id" .. ply:SteamID64()] or "user")
         ply:SetNWString("UserGroup",BAdmin.UserList["id" .. ply:SteamID64()] or "user") -- assign the rank they have
 
-        BAdmin.Utilities.chatPrint(ply,{Color(200,200,200),"You have the rank of ",Color(255,127,127),BAdmin.UserList["id" .. ply:SteamID64()],Color(200,200,200)," here!"})
+        local FinalRank = (ply:IsListenServerHost() and "host") or BAdmin.UserList["id" .. ply:SteamID64()]
+        BAdmin.Utilities.chatPrint(ply,{Color(200,200,200),"You have the rank of ",Color(255,127,127),FinalRank,Color(200,200,200)," here!"})
         net.Start("BAdmin.commandList")
             net.WriteTable(CMDList)
             net.WriteTable(CMDData)
