@@ -105,6 +105,18 @@ if SERVER then
         else return 0 end -- regular user
     end
 
+    function BAdmin.Utilities.initialRank(ply) -- assign the rank they have
+        if BAdmin.UserList["id" .. ply:SteamID64()] then
+            ply:SetUserGroup(BAdmin.UserList["id" .. ply:SteamID64()] or "user")
+            ply:SetNWString("UserGroup",BAdmin.UserList["id" .. ply:SteamID64()] or "user")
+        elseif ply:IsListenServerHost() then
+            ply:SetUserGroup("superadmin")
+            ply:SetNWString("UserGroup","superadmin")
+        end
+
+        MsgN("Set " .. BAdmin.Utilities.checkName(ply) .. " to rank " .. ply:GetNWString("UserGroup"))
+    end
+
     function BAdmin.Utilities.updateRank(id,rank,opt_ply)
         local FinalID = BAdmin.Utilities.safeID(id)
 
@@ -813,37 +825,41 @@ if SERVER then
         if state == false then return true else return false end
     end)
 
-    local CPPIExists = CPPI
-    if CPPIExists != nil then
-        MsgN("+ CPPI compliant prop protection found!")
-    else
-        MsgN("- No CPPI compliant prop protection found, install for special commands!")
-    end
-
-    if CPPIExists then -- Put anything that relies on prop protection here
-        MsgN("+ Enabling CPPI compliant commands...")
-        function callfunc(ply,args) -- Freezing the player's props
-            for k,v in pairs(ents.GetAll()) do
-                if v:CPPIGetOwner() != args[1] then continue end
-                local Phys = v:GetPhysicsObject()
-                if IsValid(Phys) then
-                    Phys:EnableMotion(false)
-                end
-            end
-
-            BAdmin.Utilities.broadcastPrint({Color(255,127,127),BAdmin.Utilities.checkName(ply),Color(200,200,200)," just froze all of ",Color(255,127,127),args[1]:Nick(),Color(200,200,200),"'s props!"})
-
-            return true
+    hook.Add("Initialize","BAdmin.CPPICheck",function()
+        local CPPIExists = CPPI
+        if CPPIExists != nil then
+            MsgN("[BADMIN] + CPPI compliant prop protection found!")
+        else
+            MsgN("[BADMIN] - No CPPI compliant prop protection found, install for special commands!")
         end
-        cmdSettings = {
-            ["Help"] = " <target> - Freeze the target's props.",
-            ["HasTarget"] = true,
-            ["CanTargetEqual"] = true,
-            ["MinimumPrivilege"] = 1,
-            ["RCONCanUse"] = true
-        }
-        BAdmin.Utilities.addCommand("freezeprops",callfunc,cmdSettings)
-    end
+
+        if CPPIExists then -- Put anything that relies on prop protection here
+            MsgN("+ Enabling CPPI compliant commands...")
+            function callfunc(ply,args) -- Freezing the player's props
+                for k,v in pairs(ents.GetAll()) do
+                    if v:CPPIGetOwner() != args[1] then continue end
+                    local Phys = v:GetPhysicsObject()
+                    if IsValid(Phys) then
+                        Phys:EnableMotion(false)
+                    end
+                end
+
+                BAdmin.Utilities.broadcastPrint({Color(255,127,127),BAdmin.Utilities.checkName(ply),Color(200,200,200)," just froze all of ",Color(255,127,127),args[1]:Nick(),Color(200,200,200),"'s props!"})
+
+                return true
+            end
+            cmdSettings = {
+                ["Help"] = " <target> - Freeze the target's props.",
+                ["HasTarget"] = true,
+                ["CanTargetEqual"] = true,
+                ["MinimumPrivilege"] = 1,
+                ["RCONCanUse"] = true
+            }
+            BAdmin.Utilities.addCommand("freezeprops",callfunc,cmdSettings)
+        end
+
+        hook.Remove("Initialize","BAdmin.CPPICheck")
+    end)
 
 ----------------------------------------------------------------------------------------------------------------
     -- autocomplete networking
@@ -870,8 +886,7 @@ if SERVER then
     end
 
     net.Receive("BAdmin.requestCommands",function(_,ply) -- also the first breathing moment the player can do anything
-        ply:SetUserGroup(BAdmin.UserList["id" .. ply:SteamID64()] or "user")
-        ply:SetNWString("UserGroup",BAdmin.UserList["id" .. ply:SteamID64()] or "user") -- assign the rank they have
+        BAdmin.Utilities.initialRank(ply)
 
         local FinalRank = (ply:IsListenServerHost() and "host") or BAdmin.UserList["id" .. ply:SteamID64()]
         BAdmin.Utilities.chatPrint(ply,{Color(200,200,200),"You have the rank of ",Color(255,127,127),FinalRank,Color(200,200,200)," here!"})
@@ -915,10 +930,7 @@ if SERVER then
     end)
 
     hook.Add("PlayerInitialSpawn","BAdmin.InitialSpawn",function(ply)
-        if BAdmin.UserList["id" .. ply:SteamID64()] then
-            ply:SetUserGroup(BAdmin.UserList["id" .. ply:SteamID64()] or "user")
-            ply:SetNWString("UserGroup",BAdmin.UserList["id" .. ply:SteamID64()] or "user") -- assign the rank they have
-        end
+        BAdmin.Utilities.initialRank(ply)
     end)
 
     MsgN("Finished loading BAdmin!")
