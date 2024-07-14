@@ -1,13 +1,14 @@
 if SERVER then
+	local MapVoteCVar = CreateConVar("badmin_enablemapvote",1,{FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED},"[BOOLEAN] Enable/disable the map voting system, in case a gamemode has one built in.",0,1)
+
 	local maps = {}
 	local mastermap = {}
 	local votees = {}
 	local VotedMaps = {}
-	Num = 0
-	FinalVoting = 0
-	LockVote = 0
-	LockTime = 0
-	WinningMap = ""
+	local FinalVoting = false
+	local LockVote = false
+	local LockTime = 0
+	local WinningMap = ""
 
 	-- Add specific names, without * to add specific maps
 	local mapprefix = {"*"}
@@ -32,7 +33,7 @@ if SERVER then
 		end
 	end
 
-	--print("MAPS: "..table.Count(PreMapsTable))
+	--print("MAPS: " .. table.Count(PreMapsTable))
 	--PrintTable(PreMapsTable,1)
 
 	local MapKeys = table.GetKeys(PreMapsTable)
@@ -55,12 +56,16 @@ if SERVER then
 
 	  -- Concommand
 	concommand.Add("votemap",function(ply)
+		if not MapVoteCVar:GetBool() then return end
+
 		net.Start("votemap_derma")
-		net.WriteTable(maps)
+			net.WriteTable(maps)
 		net.Send(ply)
 	end)
 
-	net.Receive("admin_forcemap",function()
+	net.Receive("admin_forcemap",function(_, ply)
+		if not MapVoteCVar:GetBool() then return end
+
 		local Map = net.ReadString()
 
 		PlyMsg("An admin has forced a map change (" .. Map .. "), save up! (30 seconds)")
@@ -69,16 +74,18 @@ if SERVER then
 			game.ConsoleCommand("changelevel " .. Map .. "\n")
 		end)
 
-		FinalVoting = 1
+		FinalVoting = true
 		LockTime = CurTime()
-		LockVote = 1
+		LockVote = true
 		net.Start("update")
-			net.WriteFloat(LockVote or 0)
+			net.WriteBool(LockVote or false)
 			net.WriteFloat(LockTime or 0)
 		net.Broadcast()
 	end)
 
-	net.Receive("admin_forcemap_instant",function()
+	net.Receive("admin_forcemap_instant",function(_, ply)
+		if not MapVoteCVar:GetBool() then return end
+
 		local Map = net.ReadString()
 		game.ConsoleCommand("changelevel " .. Map .. "\n")
 		PlyMsg("Ready or not, here we go to (" .. Map .. ")!")
@@ -86,7 +93,7 @@ if SERVER then
 
 	function PlyMsg(msg)
 		net.Start("ply_msg")
-		net.WriteString(msg)
+			net.WriteString(msg)
 		net.Broadcast()
 	end
 
@@ -102,19 +109,19 @@ if SERVER then
 	end
 
 	-- Receiving netcode
-	net.Receive("admin_veto",function(len,ply)
-		if FinalVoting == 1 then
+	net.Receive("admin_veto",function(_,ply)
+		if FinalVoting then
 			PlyMsg("An admin has canceled the votemap!")
 
-			FinalVoting = 0
-			LockVote = 0
+			FinalVoting = false
+			LockVote = false
 			timer.Stop("changemap")
 			timer.Stop("lockvote")
 			votees = {}
 			VotedMaps = {}
 
 			net.Start("update")
-				net.WriteFloat(LockVote or 0)
+				net.WriteBool(LockVote or false)
 				net.WriteFloat(LockTime or 0)
 			net.Broadcast()
 		else
@@ -140,8 +147,10 @@ if SERVER then
 		CountVotes()
 	end
 
-	net.Receive("cl_votemap",function(len,ply)
-		if LockVote == 0 then
+	net.Receive("cl_votemap",function(_,ply)
+		if not MapVoteCVar:GetBool() then return end
+
+		if LockVote == false then
 		local voted_map = net.ReadString()
 		votees[ply:SteamID()] = voted_map
 
@@ -164,35 +173,39 @@ if SERVER then
 	end)
 
 	function CountVotes()
-		if (table.Count(VotedMaps) >= math.ceil((2 / 3) * #player.GetAll())) and FinalVoting == 0 then
-		PlyMsg("Minimum votes reached! Lock in 30 seconds.")
+		if not MapVoteCVar:GetBool() then return end
 
-		net.Start("vote_count")
-		net.Broadcast()
+		if (table.Count(VotedMaps) >= math.ceil((2 / 3) * #player.GetAll())) and not FinalVoting then
+			PlyMsg("Minimum votes reached! Lock in 30 seconds.")
 
-		WinningMap = Tie(VotedMaps)
-		timer.Create("lockvote",30,1,function()
-			PlyMsg("Votes locked! Map: '" .. (WinningMap or "") .. "' in 30 seconds. Save up!")
-			LockTime = CurTime()
-			LockVote = 1
-			net.Start("update")
-				net.WriteFloat(LockVote or 0)
-				net.WriteFloat(LockTime or 0)
+			net.Start("vote_count")
 			net.Broadcast()
-		end)
-		timer.Start("lockvote")
 
-		timer.Create("changemap",60,1,function()
-			game.ConsoleCommand("changelevel " .. WinningMap .. "\n")
-		end)
-		timer.Start("changemap")
+			WinningMap = Tie(VotedMaps)
+			timer.Create("lockvote",30,1,function()
+				PlyMsg("Votes locked! Map: '" .. (WinningMap or "") .. "' in 30 seconds. Save up!")
 
-		FinalVoting = 1
+				LockTime = CurTime()
+				LockVote = true
+
+				net.Start("update")
+					net.WriteBool(LockVote or false)
+					net.WriteFloat(LockTime or 0)
+				net.Broadcast()
+			end)
+			timer.Start("lockvote")
+
+			timer.Create("changemap",60,1,function()
+				game.ConsoleCommand("changelevel " .. WinningMap .. "\n")
+			end)
+			timer.Start("changemap")
+
+			FinalVoting = true
 		end
 	end
-end
+else
+	local MapVoteCVar = CreateConVar("badmin_enablemapvote","1",{FCVAR_REPLICATED},"[BOOLEAN] Enable/disable the map voting system, in case a gamemode has one built in.",0,1)
 
-if CLIENT then
 	function Votemap(Maps) -- Ze magicks
 		local SelectedMap = ""
 		surface.PlaySound("garrysmod/ui_return.wav")
@@ -205,6 +218,7 @@ if CLIENT then
 		p:SetVisible(true)
 		p:Center()
 		p:MakePopup()
+		p:DoModal()
 		p:SetDraggable(false)
 
 		local mlist = vgui.Create("DListView",p) -- List of maps
@@ -242,6 +256,7 @@ if CLIENT then
 			vetobut:SetPos(U * 1.1,U * 2.1)
 			vetobut:SetSize(U * 1.25,U / 3)
 			vetobut:SetText("Cancel votemap")
+
 			function vetobut:DoClick()
 				net.Start("admin_veto")
 				net.SendToServer()
@@ -251,21 +266,21 @@ if CLIENT then
 			forcebut:SetPos(U * 1.1,U * 1.7)
 			forcebut:SetSize(U * 1.25,U / 3)
 			forcebut:SetText("Force map (LSHIFT: INSTANT)")
+
 			function forcebut:DoClick()
-			if SelectedMap != "" then
-				local shift_down = input.IsKeyDown(KEY_LSHIFT)
-				if not shift_down then
-					net.Start("admin_forcemap")
-					net.WriteString(SelectedMap)
-					net.SendToServer()
+				if SelectedMap != "" then
+					if not input.IsKeyDown(KEY_LSHIFT) then
+						net.Start("admin_forcemap")
+							net.WriteString(SelectedMap)
+						net.SendToServer()
+					else
+						net.Start("admin_forcemap_instant")
+							net.WriteString(SelectedMap)
+						net.SendToServer()
+					end
 				else
-					net.Start("admin_forcemap_instant")
-					net.WriteString(SelectedMap)
-					net.SendToServer()
+					LocalPlayer():ChatPrint("Select a map!")
 				end
-			else
-				LocalPlayer():ChatPrint("Select a map!")
-			end
 			end
 		end
 
@@ -273,6 +288,7 @@ if CLIENT then
 			MapS = mlist:GetSelected()[1]:GetColumnText(1)
 			local path = file.Exists("maps/" .. MapS .. ".png","GAME")
 			local path2 = file.Exists("maps/" .. MapS .. ".png","WORKSHOP")
+
 			if path == true or path2 == true then
 				pic:SetImage("maps/" .. MapS .. ".png")
 			else
@@ -292,15 +308,18 @@ if CLIENT then
 		end
 	end
 
-	LockVote = 0
-	LockTime = 0
+	local LockVote = false
+	local LockTime = 0
 
 	local Panic = {}
 	net.Receive("update",function()
-		LockVote = net.ReadFloat()
+		if not MapVoteCVar:GetBool() then return end
+
+		LockVote = net.ReadBool()
 		LockTime = net.ReadFloat()
+
 		LocalPlayer():StopSound("ambient/alarms/siren.wav")
-		if LockVote != 0 then LocalPlayer():EmitSound("ambient/alarms/siren.wav") end
+		if LockVote then LocalPlayer():EmitSound("ambient/alarms/siren.wav") end
 		Panic = {}
 	end)
 
@@ -343,7 +362,7 @@ if CLIENT then
 	PanicWords[#PanicWords + 1] = "Just a few more props...."
 
 	-- PanicSounds[#PanicSounds + 1] = ""
-	PanicSounds = {}
+	local PanicSounds = {}
 	PanicSounds[#PanicSounds + 1] = "vo/npc/male01/finally.wav"
 	PanicSounds[#PanicSounds + 1] = "vo/npc/male01/fantastic02.wav"
 	PanicSounds[#PanicSounds + 1] = "vo/npc/male01/gordead_ans01.wav"
@@ -417,7 +436,7 @@ if CLIENT then
 	local NextPanicSound = CurTime()
 	local Red = Color(255,0,0)
 	hook.Add("HUDPaint","SaveUpMan",function()
-		if LockVote > 0 then
+		if LockVote then
 			local X,Y = ScrW(),ScrH()
 
 			surface.SetDrawColor(ColorAlpha(Red,math.abs(math.sin(CurTime() * 0.5)) * 35))
@@ -455,6 +474,8 @@ if CLIENT then
 	end)
 
 	net.Receive("votemap_derma",function() -- Initial votemap loading
+		if not MapVoteCVar:GetBool() then return end
+
 		maps = net.ReadTable()
 		--print("Received maps! Maps: "..#maps)
 		Votemap(maps)

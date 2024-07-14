@@ -42,17 +42,18 @@ if SERVER then
 		-- Utility functions
 	----------------------------------------------------------------------------------------------------------------
 
-	CreateConVar("badmin_allowfamilyshare",1,FCVAR_ARCHIVE + FCVAR_NOTIFY,"[BOOLEAN] Whether to allow FamilyShare game licenses",0,1)
-	CreateConVar("badmin_allowgodmode",1,FCVAR_ARCHIVE + FCVAR_NOTIFY,"[BOOLEAN] Whether to allow users use of !god",0,1)
-	CreateConVar("badmin_jailautoban",15,FCVAR_ARCHIVE + FCVAR_NOTIFY,"[NUMBER] Ban the player if they leave before jailtime is up, for this amount of time in minutes",0)
+	CreateConVar("badmin_allowfamilyshare",1,{FCVAR_ARCHIVE, FCVAR_NOTIFY},"[BOOLEAN] Whether to allow FamilyShare game licenses.",0,1)
+	CreateConVar("badmin_allowgodmode",1,{FCVAR_ARCHIVE, FCVAR_NOTIFY},"[BOOLEAN] Whether to allow users use of !god.",0,1)
+	CreateConVar("badmin_jailautoban",15,{FCVAR_ARCHIVE, FCVAR_NOTIFY},"[NUMBER] Ban the player if they leave before jailtime is up, for this amount of time in minutes.",0)
 
 	BAdmin.CVarList = {}
 	local function addcvar(cvar)
 		BAdmin.CVarList[#BAdmin.CVarList + 1] = cvar
 	end
 	addcvar("sbox_noclip")
-	addcvar("badmin_allowgodmode")
 	addcvar("badmin_allowfamilyshare")
+	addcvar("badmin_allowgodmode")
+	addcvar("badmin_enablemapvote")
 	addcvar("badmin_jailautoban")
 
 	util.AddNetworkString("BAdmin.chatPrint")
@@ -137,9 +138,23 @@ if SERVER then
 		local files,dirs = file.Find(path .. "/*", "LUA")
 
 		for _,File in pairs(files) do
-			MsgN("+ Loading " .. File)
 			if not BAdmin.Utilities.fileTrack[path] then BAdmin.Utilities.fileTrack[string.StripExtension(File)] = (path .. "/" .. File) end
-			include(path .. "/" .. File)
+
+			local fileStrip = string.lower(string.Left(File, 3))
+			if fileStrip == "cl_" then
+				MsgN("+ Loading [CL] " .. File)
+
+				AddCSLuaFile(path .. "/" .. File)
+			elseif fileStrip == "sh_" then
+				MsgN("+ Loading [SH] " .. File)
+
+				AddCSLuaFile(path .. "/" .. File)
+				include(path .. "/" .. File)
+			else
+				MsgN("+ Loading " .. File)
+
+				include(path .. "/" .. File)
+			end
 		end
 
 		for _,dir in pairs(dirs) do
@@ -231,7 +246,7 @@ if SERVER then
 	-- console command, so RCON can use select commands, as well as players can have them bound
 	concommand.Add("bm",function(ply,_,arg)
 		if not arg[1] then return end
-		cmd = arg[1]
+		local cmd = arg[1]
 		table.remove(arg,1)
 		if cmd == "" then return end -- dummy player entered no command
 		if not BAdmin.Commands[cmd] then return end

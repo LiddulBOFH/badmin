@@ -43,6 +43,10 @@ BAdmin.Utilities.addCommand("help",callfunc,cmdSettings)
 --======== Opens votemap (addon)
 
 function callfunc(ply,args)
+	if not GetConVar("badmin_enablemapvote"):GetBool() then
+		return false, "Votemap is disabled on this server!"
+	end
+
 	ply:ConCommand("votemap")
 	return true
 end
