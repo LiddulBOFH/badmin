@@ -3,6 +3,17 @@ local BAdmin = BAdmin
 
 MsgN("+ Loading command system...")
 
+--[[
+
+	When a command is being added, a hook will also be run before anything is truly added
+
+	BAdmin.AddCommand
+	Args: Command name (string), Settings (table)
+
+	Return: Disable (boolean), Override (boolean), NewSettings (table)
+
+]]
+
 --[[ Variables for the commands
 	MinimumPrivilege        | 0 - User (anyone, also is default if this is left out), 1 - Admin, 2 - Superadmin, 3 - RCON or Host of localhost server
 	CanTargetEqual          | Whether the player can target an equally ranked person
@@ -37,12 +48,24 @@ MsgN("+ Loading command system...")
 	}
 
 	-- This calls the built-in function to create the command, where it can be seen with autocomplete and usable by the approriate players
-	BAdmin.Utilities.addCommand("kick",callfunc,cmdSettings)
+	BAdmin.Utilities.addCommand(
+		"kick",			-- The command string itself
+		callfunc,		-- The function defined above
+		cmdSettings,	-- The settings defined above
+		false			-- Special boolean for ignoring the hook.Run check, leave false except for extremely special commands (like the force reload ones)
+	)
 
 ]]
 
-function BAdmin.Utilities.addCommand(cmdString,func,settings)
+function BAdmin.Utilities.addCommand(cmdString, func, settings, forceDefine)
 	local CMDData = {}
+
+	if not forceDefine then
+		local Disable, Override, NewSettings = hook.Run("BAdmin.AddCommand", cmdString, settings)
+
+		if Disable then MsgN("X Blocked " .. cmdString) return end
+		if Override then MsgN("V Overridden settings for " .. cmdString) table.Merge(settings, NewSettings, false) end
+	end
 
 	table.Merge(CMDData,settings)
 	CMDData["func"] = func
@@ -128,7 +151,7 @@ cmdSettings = {
 }
 
 -- This calls the built-in function to create the command, where it can be seen with autocomplete and usable by the approriate players
-BAdmin.Utilities.addCommand("@@ba_reload",callfunc,cmdSettings)
+BAdmin.Utilities.addCommand("@@ba_reload", callfunc, cmdSettings, true)
 
 
 --- Individual reload list
@@ -148,7 +171,7 @@ cmdSettings = {
 	["MinimumPrivilege"] = 2,
 	["RCONCanUse"] = true
 }
-BAdmin.Utilities.addCommand("@@ba_indreloadlist",callfunc,cmdSettings)
+BAdmin.Utilities.addCommand("@@ba_indreloadlist", callfunc, cmdSettings, true)
 
 
 --- Individual reload command
@@ -171,4 +194,4 @@ cmdSettings = {
 	["MinimumPrivilege"] = 2,
 	["RCONCanUse"] = true
 }
-BAdmin.Utilities.addCommand("@@ba_indreload",callfunc,cmdSettings)
+BAdmin.Utilities.addCommand("@@ba_indreload", callfunc, cmdSettings, true)

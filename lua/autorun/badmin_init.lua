@@ -164,27 +164,6 @@ if SERVER then
 	end
 	local Load = BAdmin.Utilities.loadFile
 
-	-- Core folder will always load first, afterwards anything in "lua/badmin/addon" will be loaded, order depending on operating system
-
-	MsgN("+ Loading core files...")
-	Load("badmin/core")
-
-	BAdmin.Utilities.cullBanList()
-
-	-- Load our own commands first
-	MsgN("+ Adding core commands...")
-	Load("badmin/corecommands")
-
-	-- Load any command files that the current gamemode might have, if they opt to write any
-	MsgN("+ Adding gamemode commands...")
-	Load(engine.ActiveGamemode() .. "/badmin/addon")
-
-	-- Load any command files that another addon might have
-	MsgN("+ Adding addon commands...")
-	Load("badmin/addon")
-
-	MsgN("+ Finished adding commands!")
-
 	----------------------------------------------------------------------------------------------------------------
 		-- autocomplete networking
 	----------------------------------------------------------------------------------------------------------------
@@ -212,7 +191,12 @@ if SERVER then
 			BAdmin.Autocomplete.CMDData[k] = Data
 		end
 	end
+
 	BAdmin.Autocomplete.build()
+
+	timer.Simple(0.5,function()
+		BAdmin.Autocomplete.broadcast()
+	end)
 
 	-- Broadcasts autocomplete data to all of the players
 	function BAdmin.Autocomplete.broadcast()
@@ -229,10 +213,6 @@ if SERVER then
 			net.WriteTable(BAdmin.Autocomplete.CMDData)
 		net.Send(ply)
 	end
-
-	timer.Simple(0.5,function()
-		BAdmin.Autocomplete.broadcast()
-	end)
 
 	net.Receive("BAdmin.requestCommands",function(_,ply) -- also the first breathing moment the player can do anything
 		BAdmin.Utilities.initialRank(ply)
@@ -272,6 +252,47 @@ if SERVER then
 	hook.Add("PlayerInitialSpawn","BAdmin.InitialSpawn",function(ply)
 		BAdmin.Utilities.initialRank(ply)
 	end)
+
+	-- Core folder will always load first, afterwards anything in "lua/badmin/addon" will be loaded, order depending on operating system
+
+	local function LoadBM()
+		MsgN("+ Loading core files...")
+		Load("badmin/core")
+
+		BAdmin.Utilities.cullBanList()
+
+		-- Load our own commands first
+		MsgN("+ Adding core commands...")
+		Load("badmin/corecommands")
+
+		-- Load any command files that the current gamemode might have, if they opt to write any
+		MsgN("+ Adding gamemode commands...")
+		Load(engine.ActiveGamemode() .. "/badmin/addon")
+
+		-- Load any command files that another addon might have
+		MsgN("+ Adding addon commands...")
+		Load("badmin/addon")
+
+		MsgN("+ Finished adding commands!")
+
+		BAdmin.Autocomplete.build()
+
+		timer.Simple(0.5,function()
+			BAdmin.Autocomplete.broadcast()
+		end)
+	end
+
+	hook.Add("PostGamemodeLoaded", "BAdmin.PostGamemodeLoad", function()
+		LoadBM()
+
+		BAdmin.Initialized	= true
+
+		hook.Remove("PostGamemodeLoaded", "BAdmin.PostGamemodeLoad")
+	end)
+
+	if BAdmin.Initialized then
+		LoadBM()
+	end
 
 	MsgN("Finished loading BAdmin!")
 	MsgN("+-----------END BADMIN-----------+")

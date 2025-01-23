@@ -174,11 +174,28 @@ function callfunc(ply,args) -- Freezing the whole map
 	return true
 end
 cmdSettings = {
-	["Help"] = "Freezes the entire map in props.",
+	["Help"] = "Freezes all of the props across the map.",
 	["MinimumPrivilege"] = 2,
 	["RCONCanUse"] = true
 }
 BAdmin.Utilities.addCommand("freezemap",callfunc,cmdSettings)
+
+-- Toggle physics
+
+function callfunc(ply,args) -- Freezing the whole map
+
+	physenv.SetPhysicsPaused(not physenv.GetPhysicsPaused())
+
+	BAdmin.Utilities.broadcastPrint({Color(255,127,127),BAdmin.Utilities.checkName(ply),Color(200,200,200)," just toggled the physics simulation!"})
+
+	return true
+end
+cmdSettings = {
+	["Help"] = "Toggles physics sim for the whole server.",
+	["MinimumPrivilege"] = 2,
+	["RCONCanUse"] = true
+}
+BAdmin.Utilities.addCommand("togglephysics",callfunc,cmdSettings)
 
 --======== Set Jail Position
 
